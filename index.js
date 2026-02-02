@@ -1,78 +1,115 @@
-import express from 'express';
-
-console.log(">>> Server file loaded successfully");
+import express from "express";
 
 const app = express();
 const PORT = 3000;
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-
-const cars = [
-  { id: 1, make: 'Toyota', model: 'Camry', year: 2020 },
-  { id: 2, make: 'Honda', model: 'Accord', year: 2019 },
-  { id: 3, make: 'Ford', model: 'Mustang', year: 2021 },
-      
-];
-
-
-// app.get('/', (req, res) => {
-//   res.send('Hello, welcome to the Car API!');
-// });
-
-
 const router = express.Router();
 
-// Get all cars
-router.get('/', (req, res) => {
+// Middleware to parse JSON request bodies
+app.use(express.json());
+
+// In-memory data store
+let cars = [
+  { id: 1, make: "Toyota", model: "Camry", year: 2022, price: 28000 },
+  { id: 2, make: "Tesla", model: "Model S", year: 2023, price: 25000 },
+  { id: 3, make: "Ford", model: "F-150", year: 2021, price: 35000 },
+];
+
+app.use((req, res, next) => {
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] ${req.method} ${req.url}`);
+  next(); // Pass control to the next middleware/route
+});
+
+app.get("/", (req, res) => {
+  // throw new Error("This is a test error");
+  res.send("Hello from Car API!");
+});
+
+router.get("/cars", (req, res) => {
   res.json(cars);
 });
 
-// Get car by ID
-router.get('/:id', (req, res) => {
-  const  id =  parseInt(req.params.id, 10);
-  const car = cars.find(car => car.id === id);  
-  if (!car) {
-    return res.status(404).send('Car not found');
-  } 
-  res.json(car);
-});
-
-router.post('/', (req, res) => {
-  console.log("Incoming Headers:", req.headers);
-  console.log("Incoming Body:", req.body);
-
-  const { make, model, year } = req.body;
+router.post("/cars", (req, res) => {
+  const { make, model, year, price } = req.body;
 
   // Validation
-  if (!make || !model || !year) {
-    return res.status(400).json({ error: 'Missing required fields: make, model, year' });
+  if (!make || !model || !year || !price) {
+    return res.status(400).json({error: "Please provide make, model, year, and price",});
   }
 
+  const nextId = cars.length + 1;
+
   const newCar = {
-    id: cars.length + 1,
+    id: nextId,
     make,
     model,
-    year: parseInt(year, 10)
+    year: parseInt(year),
+    price: parseFloat(price),
   };
 
   cars.push(newCar);
+
   res.status(201).json(newCar);
 });
-router.put('/:id', (req, res) => {
-  res.send(`Car with ID updated successfully`);
+
+router.put("/cars/:id", (req, res) => {
+  const carId = parseInt(req.params.id);
+  const carIndex = cars.findIndex((c) => c.id === carId);
+
+  if (carIndex === -1) {
+    return res.status(404).json({ error: "Car not found" });
+  }
+
+  const { make, model, year, price } = req.body;
+
+  // Update only provided fields
+  if (make) cars[carIndex].make = make;
+  if (model) cars[carIndex].model = model;
+  if (year) cars[carIndex].year = parseInt(year);
+  if (price) cars[carIndex].price = parseFloat(price);
+
+  res.json(cars[carIndex]);
 });
 
-router.delete('/:id', (req, res) => {
-  res.send(`Car with ID deleted successfully`);
+router.delete("/cars/:id", (req, res) => {
+  const carId = parseInt(req.params.id);
+  const carIndex = cars.findIndex((c) => c.id === carId);
+
+  if (carIndex === -1) {
+    return res.status(404).json({ error: "Car not found" });
+  }
+
+  const deletedCar = cars.splice(carIndex, 1)[0];
+
+  res.json({
+    message: "Car deleted successfully",
+    car: deletedCar,
+  });
 });
 
+router.get("/cars/:id", (req, res) => {
+  const carId = parseInt(req.params.id);
+  const car = cars.find((c) => c.id === carId);
 
+  if (!car) {
+    return res.status(404).json({ error: "Car not found" });
+  }
 
-app.use('/api/v1/cars', router);
+  res.json(car);
+});
+
+app.use("/api/v1", router);
+
+// Error handling middleware (must be last)
+app.use((err, req, res, next) => {
+  console.error("Error:", err.message);
+  res.status(500).json({
+    error: "Something went wrong!",
+    message: err.message,
+  });
+});
 
 app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+  console.log(`Server running on http://localhost:${PORT}`);
 });
-
